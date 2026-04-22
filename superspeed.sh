@@ -140,8 +140,9 @@ show_result() {
 preinfo() {
 	echo "———————————————————SuperSpeed 全面测速版———————————————————"
 	echo "       作者:  hello-yunshu"
-	echo "       项目:  https://github.com/hello-yunshu/superspeed"
+	echo "       项目:  https://github.com/hello-yunshu"
 	echo "       节点更新: 2026/04/22  | 脚本更新: 2026/04/22"
+	echo "       ${RED}注意: 请勿频繁测试，避免被限制！${PLAIN}"
 	echo "——————————————————————————————————————————————————————————"
 }
 
