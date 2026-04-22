@@ -97,7 +97,8 @@ speed_test(){
 	if [[ ${is_upload} ]]; then
         local REDownload=$(cat $speedLog | awk -F ' ' '/Download/{print $3}')
         local reupload=$(cat $speedLog | awk -F ' ' '/Upload/{print $3}')
-        local relatency=$(cat $speedLog | awk -F ' ' '/Latency/{print $2}')
+        # 改进的延迟解析 - 匹配 Latency: 后面的数值
+        local relatency=$(cat $speedLog | grep 'Latency:' | awk -F 'Latency: ' '{print $2}' | awk -F ' ' '{print $1}' | tr -d 'ms' | tr -d ',')
         
 		local nodeID=$1
 		local nodeLocation=$2
@@ -110,9 +111,17 @@ speed_test(){
 		temp=$(echo "${REDownload}" | awk -F ' ' '{print $1}')
         if [[ $(awk -v num1=${temp} -v num2=0 'BEGIN{print(num1>num2)?"1":"0"}') -eq 1 ]]; then
         	printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${CYAN}%s%-10s${BLUE}%s%-10s${PURPLE}%-8s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "↑ " "${reupload}" "↓ " "${REDownload}" "${relatency}" | tee -a $log
+        else
+            # 下载速度为0时也显示信息
+            printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${RED}%-20s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "[ERROR] Speed test failed" | tee -a $log
 		fi
 	else
-        local cerror="ERROR"
+        # 完全失败的情况
+        local nodeID=$1
+        local nodeLocation=$2
+        local nodeISP=$3
+        strnodeLocation="${nodeLocation}　　　　　　"
+        printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${RED}%-20s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "[ERROR] Connection failed" | tee -a $log
 	fi
 }
 
