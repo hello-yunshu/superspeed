@@ -28,18 +28,27 @@ checksystem() {
 	    release="ubuntu"
 	elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
 	    release="centos"
+	else
+	    if command -v apt-get > /dev/null 2>&1; then
+	        release="debian"
+	    elif command -v yum > /dev/null 2>&1; then
+	        release="centos"
+	    else
+	        echo -e "${RED}不支持的系统，脚本可能无法正常工作${PLAIN}"
+	        release="unknown"
+	    fi
 	fi
 }
 
 checkpython() {
-	if  [ ! -e '/usr/bin/python' ]; then
-		echo "正在安装 Python"
+	if  [ ! -e '/usr/bin/python3' ]; then
+		echo "正在安装 Python3"
 		if [ "${release}" == "centos" ]; then
 			yum update > /dev/null 2>&1
-			yum -y install python > /dev/null 2>&1
+			yum -y install python3 > /dev/null 2>&1
 		else
 			apt-get update > /dev/null 2>&1
-			apt-get -y install python > /dev/null 2>&1
+			apt-get -y install python3 > /dev/null 2>&1
 		fi
 	fi
 }
@@ -74,53 +83,48 @@ checkspeedtest() {
 	if  [ ! -e './speedtest-cli/speedtest' ]; then
 		echo "正在安装 Speedtest-cli"
 		mkdir -p speedtest-cli
-		# 映射 uname -m 输出到 Ookla 的架构命名
 		case $(uname -m) in
 			i?86) arch="i386" ;;
 			x86_64) arch="x86_64" ;;
 			armv5*) arch="armel" ;;
 			armv6*|armv7*) arch="armhf" ;;
 			aarch64) arch="aarch64" ;;
-			*) arch="x86_64" ;; # 默认 x86_64
+			*) arch="x86_64" ;;
 		esac
 		wget --no-check-certificate -qO speedtest.tgz "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-${arch}.tgz"
+		tar zxvf speedtest.tgz -C ./speedtest-cli/ > /dev/null 2>&1 && chmod a+rx ./speedtest-cli/speedtest
 	fi
-	tar zxvf speedtest.tgz -C ./speedtest-cli/ > /dev/null 2>&1 && chmod a+rx ./speedtest-cli/speedtest
 }
 
 speed_test(){
 	speedLog="./speedtest.log"
 	log="./superspeed.log"
-	true > $speedLog
-	speedtest-cli/speedtest -p no -s $1 --accept-license --accept-gdpr > $speedLog 2>&1
-	is_upload=$(cat $speedLog | grep 'Upload')
+	true > "$speedLog"
+	speedtest-cli/speedtest -p no -s "$1" --accept-license --accept-gdpr > "$speedLog" 2>&1
+	is_upload=$(cat "$speedLog" | grep 'Upload')
 	if [[ ${is_upload} ]]; then
-		local REDownload=$(cat $speedLog | awk -F ' ' '/Download/{print $3}')
-		local reupload=$(cat $speedLog | awk -F ' ' '/Upload/{print $3}')
-		# 改进的延迟解析 - 匹配 Latency: 后面的数值
-		local relatency=$(cat $speedLog | grep 'Latency:' | awk -F 'Latency: ' '{print $2}' | awk -F ' ' '{print $1}' | tr -d 'ms' | tr -d ',')
+		local REDownload=$(cat "$speedLog" | awk -F ' ' '/Download/{print $3}')
+		local reupload=$(cat "$speedLog" | awk -F ' ' '/Upload/{print $3}')
+		local relatency=$(cat "$speedLog" | grep 'Latency:' | awk -F 'Latency: ' '{print $2}' | awk -F ' ' '{print $1}' | tr -d 'ms' | tr -d ',')
 		
 		local nodeID=$1
 		local nodeLocation=$2
 		local nodeISP=$3
 		
 		strnodeLocation="${nodeLocation}　　　　　　"
-		LANG=C
 		
-		temp=$(echo "${REDownload}" | awk -F ' ' '{print $1}')
-		if [[ $(awk -v num1=${temp} -v num2=0 'BEGIN{print(num1>num2)?"1":"0"}') -eq 1 ]]; then
-			printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${CYAN}%s%-10s${BLUE}%s%-10s${PURPLE}%-8s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "↑ " "${reupload}" "↓ " "${REDownload}" "${relatency}" | tee -a $log
+		temp=$(echo "${REDownload}" | LANG=C awk -F ' ' '{print $1}')
+		if [[ $(awk -v num1="${temp}" -v num2=0 'BEGIN{print(num1>num2)?"1":"0"}') -eq 1 ]]; then
+			printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${CYAN}%s%-10s${BLUE}%s%-10s${PURPLE}%-8s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "↑ " "${reupload}" "↓ " "${REDownload}" "${relatency}" | tee -a "$log"
 		else
-			# 下载速度为0时也显示信息
-			printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${RED}%-20s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "[ERROR] Speed test failed" | tee -a $log
+			printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${RED}%-20s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "[ERROR] Speed test failed" | tee -a "$log"
 		fi
 	else
-		# 完全失败的情况
 		local nodeID=$1
 		local nodeLocation=$2
 		local nodeISP=$3
 		strnodeLocation="${nodeLocation}　　　　　　"
-		printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${RED}%-20s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "[ERROR] Connection failed" | tee -a $log
+		printf "${RED}%-6s${YELLOW}%s%s${GREEN}%-24s${RED}%-20s${PLAIN}\n" "${nodeID}"  "${nodeISP}" "|" "${strnodeLocation:0:24}" "[ERROR] Connection failed" | tee -a "$log"
 	fi
 }
 
@@ -211,7 +215,7 @@ runtest() {
 		 speed_test '4504' '甘肃兰州' '移动'
 
 		end=$(date +%s)  
-		rm -rf speedtest*
+		rm -f speedtest.tgz speedtest.log && rm -rf speedtest-cli
 		time=$(( $end - $start ))
 		show_result
 		echo -e "  ${GREEN}# 三网测速中为避免节点数不均及测试过久，每部分未使用所${PLAIN}"
@@ -244,7 +248,7 @@ runtest() {
 	 speed_test '5674' '广西南宁' '电信'
 
 		end=$(date +%s)  
-		rm -rf speedtest*
+		rm -f speedtest.tgz speedtest.log && rm -rf speedtest-cli
 		time=$(( $end - $start ))
 		show_result
 	fi
@@ -282,7 +286,7 @@ runtest() {
 		 speed_test '13704' '江苏南京' '联通'
 
 		end=$(date +%s)  
-		rm -rf speedtest*
+		rm -f speedtest.tgz speedtest.log && rm -rf speedtest-cli
 		time=$(( $end - $start ))
 		show_result
 	fi
@@ -351,7 +355,7 @@ runtest() {
 		 speed_test '25637' '上海５Ｇ' '移动'
 
 		end=$(date +%s)  
-		rm -rf speedtest*
+		rm -f speedtest.tgz speedtest.log && rm -rf speedtest-cli
 		time=$(( $end - $start ))
 		show_result
 	fi
@@ -359,7 +363,7 @@ runtest() {
 	if [[ ${selection} == 6 ]]; then
 		echo "——————————————————————————————————————————————————————————"
 		echo "  正在清理下载文件..."
-		rm -rf speedtest*
+		rm -f speedtest.tgz speedtest.log && rm -rf speedtest-cli
 		rm -f ./superspeed.log
 		echo -e "  ${GREEN}清理完成！${PLAIN}"
 		echo "——————————————————————————————————————————————————————————"
