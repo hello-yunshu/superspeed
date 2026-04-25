@@ -146,7 +146,7 @@ preinfo() {
 	echo "       作者:  hello-yunshu"
 	echo "       项目:  https://github.com/hello-yunshu"
 	echo "       节点更新: 2026/04/24  | 脚本更新: 2026/04/24"
-	echo "       ${RED}注意: 请勿频繁测试，避免被限制！${PLAIN}"
+	echo -e "       ${RED}注意: 请勿频繁测试，避免被限制！${PLAIN}"
 	echo "——————————————————————————————————————————————————————————"
 }
 
